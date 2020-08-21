@@ -63,7 +63,7 @@ func (c *Container) getHostVeths() ([]*Veth, error) {
 		}
 		veth, err := parseVeth(b)
 		if err != nil {
-			glog.Errorf("getAllVeth, parseVeth: %v, veth: %s", err, b)
+			glog.Errorf("getHostVeths, parseVeth: %v, veth: %s", err, b)
 			continue
 		}
 		veths = append(veths, &veth)
@@ -94,7 +94,7 @@ func (c *Container) getContainerVeths(name, sandboxKey string) ([]*Veth, error) 
 		}
 		veth, err := parseVeth(b)
 		if err != nil {
-			glog.Errorf("getContainerVeth, parseVeth: %v, veth: %s", err, b)
+			glog.Errorf("getContainerVeths, parseVeth: %v, veth: %s", err, b)
 			continue
 		}
 		veths = append(veths, &veth)
