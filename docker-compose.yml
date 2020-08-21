@@ -1,0 +1,20 @@
+version: '2.2'
+
+services:
+  tc-docker:
+    image: codyguo/tc-docker
+    container_name: tc-docker
+    privileged: true
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker/netns:/var/run/docker/netns:shared
+    environment:
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+      DOCKER_API_VERSION: "1.40"
+    network_mode: host
+
+networks:
+  default:
+    external:
+      name: host
