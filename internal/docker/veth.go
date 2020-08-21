@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 
 	"github.com/CodyGuo/glog"
@@ -16,31 +17,45 @@ type Veth struct {
 	LinkIdent string
 }
 
-func (c *Container) getVeth(name, sandboxKey string) (string, error) {
-	veth, err := c.getContanierVeth(name, sandboxKey)
-	if err != nil {
-		return "", err
-	}
-	veths, err := c.getAllVeth()
-	if err != nil {
-		return "", err
-	}
-	for _, v := range veths {
-		if veth.Ident == v.LinkIdent && veth.LinkIdent == v.Ident {
-			glog.Debugf("getVeth, container: %s, device: %s", name, v.Device)
-			return string(v.Device), nil
-		}
-	}
-	return "", errors.New("not found veth")
-}
-
-func (c *Container) getAllVeth() ([]*Veth, error) {
-	ethxs, err := command.CombinedOutput("/usr/sbin/ip addr")
+func (c *Container) GetVeths(name, sandboxKey string) ([]string, error) {
+	containerVeths, err := c.getContainerVeths(name, sandboxKey)
 	if err != nil {
 		return nil, err
 	}
+	hostVeths, err := c.getHostVeths()
+	if err != nil {
+		return nil, err
+	}
+	veths := []string{}
+	for _, hv := range hostVeths {
+		for _, cv := range containerVeths {
+			if cv.Ident == hv.LinkIdent && cv.LinkIdent == hv.Ident {
+				glog.Debugf("GetVeths found, container: %s, device: %s, veth: %+v", name, hv.Device, *cv)
+				veths = append(veths, hv.Device)
+			}
+		}
+	}
+	if len(veths) == 0 {
+		return nil, fmt.Errorf("container: %s, not found veth", name)
+	}
+	return veths, nil
+}
+
+func (c *Container) RemoveVeth(name string) error {
+	veth := "/var/run/netns/" + name
+	glog.Debugf("RemoveVeth: %s", veth)
+	return os.Remove(veth)
+}
+
+func (c *Container) getHostVeths() ([]*Veth, error) {
+	ipAddrCmd := "/usr/sbin/ip addr show type veth"
+	glog.Debug(ipAddrCmd)
+	out, err := command.CombinedOutput(ipAddrCmd)
+	if err != nil {
+		return nil, fmt.Errorf("out: %s, error: %v", out, err)
+	}
 	var veths []*Veth
-	scanner := bufio.NewScanner(bytes.NewReader(ethxs))
+	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
 		b := scanner.Bytes()
 		if !bytes.Contains(b, []byte("veth")) {
@@ -56,14 +71,35 @@ func (c *Container) getAllVeth() ([]*Veth, error) {
 	return veths, nil
 }
 
-func (c *Container) getContanierVeth(name, sandboxKey string) (Veth, error) {
+func (c *Container) getContainerVeths(name, sandboxKey string) ([]*Veth, error) {
 	os.Remove("/var/run/netns/" + name)
-	os.Symlink(sandboxKey, "/var/run/netns/"+name)
-	ethxs, err := command.CombinedOutput("/usr/sbin/ip netns exec " + name + " ip addr show eth0")
-	if err != nil {
-		return Veth{}, err
+	if err := os.Symlink(sandboxKey, "/var/run/netns/"+name); err != nil {
+		return nil, err
 	}
-	return parseVeth(ethxs)
+	ipAddrCmd := fmt.Sprintf("/usr/sbin/ip netns exec %s ip addr show ", name)
+	glog.Debug(ipAddrCmd)
+	out, err := command.CombinedOutput(ipAddrCmd)
+	if err != nil {
+		return nil, fmt.Errorf("out: %s, error: %v", out, err)
+	}
+	var veths []*Veth
+	scanner := bufio.NewScanner(bytes.NewReader(out))
+	for scanner.Scan() {
+		b := scanner.Bytes()
+		if !bytes.Contains(b, []byte("UP")) {
+			continue
+		}
+		if bytes.Contains(b, []byte("LOOPBACK")) {
+			continue
+		}
+		veth, err := parseVeth(b)
+		if err != nil {
+			glog.Errorf("getContainerVeth, parseVeth: %v, veth: %s", err, b)
+			continue
+		}
+		veths = append(veths, &veth)
+	}
+	return veths, nil
 }
 
 func parseVeth(b []byte) (Veth, error) {

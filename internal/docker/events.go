@@ -22,19 +22,21 @@ func (c *Container) EventStart(h func(Container) error) <-chan error {
 			errStream <- err
 			return
 		}
-		veth, err := c.getVeth(name, sandboxKey)
+		veths, err := c.GetVeths(name, sandboxKey)
 		if err != nil {
 			errStream <- err
 			return
 		}
 		rate, ceil := c.getLabelTC(e.Actor.Attributes)
-		err = h(Container{
-			ID:     e.ID[:12],
-			Name:   name,
-			Veth:   veth,
-			TcRate: rate,
-			TcCeil: ceil,
-		})
+		for _, veth := range veths {
+			err = h(Container{
+				ID:     e.ID[:12],
+				Name:   name,
+				Veth:   veth,
+				TcRate: rate,
+				TcCeil: ceil,
+			})
+		}
 		if err != nil {
 			errStream <- err
 		}

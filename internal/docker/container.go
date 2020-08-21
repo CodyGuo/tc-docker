@@ -2,6 +2,7 @@ package docker
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/docker/docker/api/types"
@@ -32,31 +33,34 @@ func (c *Container) GetRunningList() ([]*Container, error) {
 	f.Add("status", "running")
 	containerList, err := c.dc.ContainerList(c.ctx, types.ContainerListOptions{Filters: f})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ContainerList error: %v", err)
 	}
 
 	var containers []*Container
 	for _, container := range containerList {
 		name, err := c.getName(container.ID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("getName error: %v", err)
 		}
 		sandboxKey, err := c.getSandboxKey(container.ID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("getSandboxKey error: %v", err)
 		}
-		veth, err := c.getVeth(name, sandboxKey)
+		veths, err := c.GetVeths(name, sandboxKey)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("GetRunningList.getVeths error: %v", err)
 		}
 		rate, ceil := c.getLabelTC(container.Labels)
-		containers = append(containers, &Container{
-			ID:     container.ID[:12],
-			Name:   name,
-			Veth:   veth,
-			TcRate: rate,
-			TcCeil: ceil,
-		})
+		for _, veth := range veths {
+			containers = append(containers, &Container{
+				ID:     container.ID[:12],
+				Name:   name,
+				Veth:   veth,
+				TcRate: rate,
+				TcCeil: ceil,
+			})
+
+		}
 	}
 	return containers, nil
 }

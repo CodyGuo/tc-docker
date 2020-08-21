@@ -51,8 +51,8 @@ var rootCmd = &cobra.Command{
 			return nil
 		})
 		dieErr := c.EventDie(func(container docker.Container) error {
-			glog.Infof("container stopped, name: %s, id: %s", container.Name, container.ID)
-			return nil
+			glog.Infof("Container stopped, name: %s, id: %s", container.Name, container.ID)
+			return c.RemoveVeth(container.Name)
 		})
 		for {
 			select {
