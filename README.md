@@ -53,9 +53,9 @@ Run the `ubuntu` container, specify all possible labels and try to `iperf -c 127
 ```bash
 docker run -it \
     -p 5001:5001 \
-	--label "org.label-schema.tc.enabled=1" \
-	--label "org.label-schema.tc.rate=1mbps" \
-	--label "org.label-schema.tc.ceil=10mbps" \
+    --label "org.label-schema.tc.enabled=1" \
+    --label "org.label-schema.tc.rate=1mbps" \
+    --label "org.label-schema.tc.ceil=10mbps" \
     ubuntu sh -c " \
     apt-get update \
     && apt-get install iperf \
